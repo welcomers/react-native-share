@@ -37,14 +37,25 @@ static UIDocumentInteractionController *documentInteractionController;
             return failureCallback(error);
         }
 
-        if ([options[@"url"] rangeOfString:@"wam"].location != NSNotFound) {
+        if ([options[@"url"] rangeOfString:@"wam"].location != NSNotFound || [options[@"url"] rangeOfString:@"mp4"].location != NSNotFound) {
             NSLog(@"Sending whatsapp movie");
-            documentInteractionController = [UIDocumentInteractionController interactionControllerWithURL:[NSURL fileURLWithPath:options[@"url"]]];
+            NSURL *tempFile = [self createTempFile:options[@"url"] type:@"whatsAppTmp.wam"];
+            documentInteractionController = [UIDocumentInteractionController interactionControllerWithURL:tempFile];
             documentInteractionController.UTI = @"net.whatsapp.movie";
             documentInteractionController.delegate = self;
 
             [documentInteractionController presentOpenInMenuFromRect:CGRectMake(0, 0, 0, 0) inView:[[[[[UIApplication sharedApplication] delegate] window] rootViewController] view] animated:YES];
             NSLog(@"Done whatsapp movie");
+            successCallback(@[]);
+        } else if ([options[@"url"] rangeOfString:@"wai"].location != NSNotFound) {
+            NSLog(@"Sending whatsapp image");
+            NSURL *tempFile = [self createTempFile:options[@"url"] type:@"whatsAppTmp.wai"];
+            documentInteractionController = [UIDocumentInteractionController interactionControllerWithURL:tempFile];
+            documentInteractionController.UTI = @"net.whatsapp.image";
+            documentInteractionController.delegate = (id)self;
+
+            [documentInteractionController presentOpenInMenuFromRect:CGRectMake(0, 0, 0, 0) inView:[[[[[UIApplication sharedApplication] delegate] window] rootViewController] view] animated:YES];
+            NSLog(@"Done whatsapp image");
             successCallback(@[]);
         } else {
             text = (NSString*)CFBridgingRelease(CFURLCreateStringByAddingPercentEscapes(NULL,(CFStringRef) text, NULL,CFSTR("!*'();:@&=+$,/?%#[]"),kCFStringEncodingUTF8));
@@ -58,6 +69,52 @@ static UIDocumentInteractionController *documentInteractionController;
             }
         }
     }
+}
+
+#pragma mark - Helpers
+- (NSURL *)createTempFile:(NSString *)path type:(NSString *)type
+{
+    NSData *data = [[NSData alloc]initWithContentsOfFile:path];
+	NSError *error = nil;
+	NSURL *tempFile = [[NSFileManager defaultManager] URLForDirectory:NSDocumentDirectory
+															 inDomain:NSUserDomainMask
+													appropriateForURL:nil
+															   create:YES
+																error:&error];
+
+	if (tempFile && !error) {
+		tempFile = [tempFile URLByAppendingPathComponent:type];
+	} else {
+		[self alertError:[NSString stringWithFormat:@"Error getting document directory: %@", error]];
+	}
+	
+	if (![data writeToFile:tempFile.path options:NSDataWritingAtomic error:&error]) {
+		[self alertError:[NSString stringWithFormat:@"Error writing File: %@", error]];
+	}
+
+	return tempFile;
+}
+
+- (void)alertWithTitle:(NSString *)title message:(NSString *)message
+{
+	UIViewController *vc = [[[[UIApplication sharedApplication] delegate] window] rootViewController];
+	UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
+																   message:message
+															preferredStyle:UIAlertControllerStyleAlert];
+	
+	[alert addAction:[UIAlertAction actionWithTitle:@"OK"
+										   style:UIAlertActionStyleCancel
+										 handler:^(UIAlertAction *action) {
+											 
+		 [vc dismissViewControllerAnimated:YES completion:^{}];
+	 }]];
+	
+	[vc presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)alertError:(NSString *)message
+{
+	[self alertWithTitle:@"Error" message:message];
 }
 
 @end
